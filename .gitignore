@@ -1,6 +1,0 @@
-node_modules/
-sessions/
-output/
-logs/
-.env
-*.log

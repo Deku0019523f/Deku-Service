@@ -8,7 +8,7 @@ import {
 import pino from 'pino';
 import path from 'path';
 import fs from 'fs';
-import { log } from '../cli/index.js';
+
 
 const SESSIONS_DIR = './sessions';
 
@@ -21,7 +21,7 @@ export function clearSession(phoneNumber) {
   const dir = path.join(SESSIONS_DIR, phoneNumber);
   if (fs.existsSync(dir)) {
     fs.rmSync(dir, { recursive: true, force: true });
-    log('info', 'Session précédente supprimée.');
+    console.log('[WA]', 'Session précédente supprimée.');
   }
 }
 
@@ -84,7 +84,7 @@ export function connectWithPairingCode(phoneNumber, onPairingCode, onConnected) 
 
     // Déjà enregistré ? (session reconnectée)
     if (sock.authState?.creds?.registered) {
-      log('info', 'Session déjà enregistrée, pas de pairing code nécessaire.');
+      console.log('[WA]', 'Session déjà enregistrée, pas de pairing code nécessaire.');
       return;
     }
 
@@ -93,7 +93,7 @@ export function connectWithPairingCode(phoneNumber, onPairingCode, onConnected) 
     try {
       pairingCode = await sock.requestPairingCode(phoneNumber);
     } catch (err) {
-      log('warn', `Retry pairing code : ${err.message}`);
+      console.warn('[WA ⚠]', `Retry pairing code : ${err.message}`);
       await new Promise(r => setTimeout(r, 2000));
       try {
         pairingCode = await sock.requestPairingCode(phoneNumber);
@@ -119,10 +119,10 @@ function attachHandlers(phoneNumber, sock, resolve, reject, onConnected) {
 
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect } = update;
-    if (connection) log('info', `État connexion : ${connection}`);
+    if (connection) console.log('[WA]', `État connexion : ${connection}`);
 
     if (connection === 'open') {
-      log('success', 'Connexion WhatsApp établie !');
+      console.log('[WA ✅]', 'Connexion WhatsApp établie !');
       reconnectAttempts.delete(phoneNumber);
       const jid = sock.user?.id ?? `${phoneNumber}@s.whatsapp.net`;
       if (resolve) resolve({ socket: sock, jid });
@@ -131,7 +131,7 @@ function attachHandlers(phoneNumber, sock, resolve, reject, onConnected) {
 
     if (connection === 'close') {
       const code = lastDisconnect?.error?.output?.statusCode;
-      log('warn', `Connexion fermée (code ${code})`);
+      console.warn('[WA ⚠]', `Connexion fermée (code ${code})`);
 
       if (code === DisconnectReason.loggedOut) {
         activeSockets.delete(phoneNumber);
@@ -147,13 +147,13 @@ function attachHandlers(phoneNumber, sock, resolve, reject, onConnected) {
       if (attempts >= MAX_RECONNECT) {
         reconnectAttempts.delete(phoneNumber);
         activeSockets.delete(phoneNumber);
-        log('error', `Max tentatives de reconnexion atteint.`);
+        console.error('[WA ❌]', `Max tentatives de reconnexion atteint.`);
         if (reject) reject(new Error(`MAX_RECONNECT_REACHED`));
         return;
       }
 
       const wait = Math.min(5000 * attempts, 30000);
-      log('info', `Reconnexion dans ${wait / 1000} s (tentative ${attempts}/${MAX_RECONNECT})…`);
+      console.log('[WA]', `Reconnexion dans ${wait / 1000} s (tentative ${attempts}/${MAX_RECONNECT})…`);
       setTimeout(() => reconnectAccount(phoneNumber, resolve, reject, onConnected), wait);
     }
   });
@@ -173,9 +173,9 @@ async function reconnectAccount(phoneNumber, resolve, reject, onConnected) {
     const sock = await createSocket(phoneNumber);
     activeSockets.set(phoneNumber, sock);
     attachHandlers(phoneNumber, sock, resolve, reject, onConnected);
-    log('info', 'Socket recréé pour reconnexion.');
+    console.log('[WA]', 'Socket recréé pour reconnexion.');
   } catch (err) {
-    log('error', `Échec reconnexion : ${err.message}`);
+    console.error('[WA ❌]', `Échec reconnexion : ${err.message}`);
     if (reject) reject(new Error(`RECONNECT_FAILED: ${err.message}`));
   }
 }
@@ -200,7 +200,7 @@ export async function sendImage(socket, to, imagePath, caption) {
   await socket.sendMessage(normalizeJid(to), {
     image: fs.readFileSync(imagePath), caption,
   });
-  log('success', `Image envoyée à ${to}`);
+  console.log('[WA ✅]', `Image envoyée à ${to}`);
 }
 
 export async function sendDocument(socket, to, docPath, filename, caption = '') {
@@ -210,12 +210,12 @@ export async function sendDocument(socket, to, docPath, filename, caption = '') 
     mimetype: 'application/pdf',
     caption,
   });
-  log('success', `Document "${filename}" envoyé à ${to}`);
+  console.log('[WA ✅]', `Document "${filename}" envoyé à ${to}`);
 }
 
 export async function sendTextMessage(socket, to, text) {
   await socket.sendMessage(normalizeJid(to), { text });
-  log('success', `Message envoyé à ${to}`);
+  console.log('[WA ✅]', `Message envoyé à ${to}`);
 }
 
 function normalizeJid(number) {

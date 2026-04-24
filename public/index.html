@@ -336,12 +336,37 @@
 
   </div>
 
+  <!-- Debug log — visible uniquement si JS actif -->
+  <div id="debug-panel" style="margin-top:24px;display:none">
+    <div style="font-size:11px;color:#4b5563;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+      <span>🔍 Logs réseau</span>
+      <button onclick="document.getElementById('debug-log').innerHTML=''" style="background:none;border:none;color:#4b5563;cursor:pointer;font-size:11px">Vider</button>
+    </div>
+    <div id="debug-log" style="background:#0a0c12;border:1px solid #2a2d3a;border-radius:8px;padding:12px;max-height:180px;overflow-y:auto;font-family:monospace;font-size:11px;line-height:1.6"></div>
+  </div>
+
 </div><!-- /container -->
 
 <div id="toast"></div>
 
 <script>
-const BASE = window.location.origin; // https://deku-service.onrender.com ou localhost:3000
+const BASE = window.location.origin;
+
+// ── Debug helper — affiche dans la page ET la console ──────────────────────
+function dbg(msg, isErr = false) {
+  console[isErr ? 'error' : 'log']('[WA-UI]', msg);
+  const el = document.getElementById('debug-log');
+  if (el) {
+    const line = document.createElement('div');
+    line.style.color = isErr ? '#f87171' : '#86efac';
+    line.style.fontSize = '11px';
+    line.style.fontFamily = 'monospace';
+    line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    el.prepend(line);
+    // Garder max 20 lignes
+    while (el.children.length > 20) el.removeChild(el.lastChild);
+  }
+}
 
 // ── Tab navigation ──────────────────────────────────────────────────────────
 function switchTab(name) {
@@ -370,10 +395,10 @@ function toast(msg, ok = true) {
   const el = document.getElementById('toast');
   el.textContent = (ok ? '✅ ' : '❌ ') + msg;
   el.className = 'show';
-  setTimeout(() => el.className = '', 3000);
+  setTimeout(() => el.className = '', 4000);
 }
 
-// ── Copy to clipboard ───────────────────────────────────────────────────────
+// ── Copy ────────────────────────────────────────────────────────────────────
 function copy(text) {
   navigator.clipboard.writeText(text).then(() => toast('Copié !'));
 }
@@ -390,7 +415,16 @@ async function startConnect() {
 
   const btn = document.getElementById('btn-connect');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spin"></span> Connexion…';
+  btn.innerHTML = '<span class="spin"></span> Connexion en cours…';
+
+  // Afficher la zone de debug
+  document.getElementById('pairing-box').style.display = 'block';
+  document.getElementById('connect-status-area').innerHTML = `
+    <div class="alert alert-warning" style="margin-top:12px">
+      ⏳ Initialisation de la connexion WhatsApp…
+    </div>`;
+
+  dbg(`POST ${BASE}/api/connect  phone=${phone}`);
 
   try {
     const r = await fetch(`${BASE}/api/connect`, {
@@ -398,34 +432,73 @@ async function startConnect() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phone }),
     });
+
+    dbg(`Réponse HTTP : ${r.status} ${r.statusText}`);
+
+    if (!r.ok) {
+      const txt = await r.text();
+      dbg(`Erreur serveur : ${txt}`, true);
+      toast(`Erreur ${r.status} : ${txt.slice(0,80)}`, false);
+      document.getElementById('connect-status-area').innerHTML = `
+        <div class="alert alert-error" style="margin-top:12px">
+          ❌ Erreur ${r.status} : ${txt.slice(0,200)}
+        </div>`;
+      btn.disabled = false;
+      btn.innerHTML = '<span>🔗</span> Générer le code d'appairage';
+      return;
+    }
+
     const data = await r.json();
+    dbg(`Réponse : ${JSON.stringify(data)}`);
 
     if (data.status === 'already_connected') {
       showConnected(phone, data.apiKey);
       btn.disabled = false;
-      btn.innerHTML = '<span>🔗</span> Générer le code d\'appairage';
+      btn.innerHTML = '<span>🔗</span> Générer le code d'appairage';
       return;
     }
 
-    // Démarrer le polling
+    // Lancer le polling (code arrivera dans quelques secondes)
+    document.getElementById('connect-status-area').innerHTML = `
+      <div class="alert alert-warning" style="margin-top:12px">
+        ⏳ Socket WhatsApp en cours de création… Le code apparaîtra ici dans ~5 secondes.
+      </div>`;
     startPolling(phone);
 
   } catch (err) {
+    dbg(`Fetch échoué : ${err.message}`, true);
     toast('Erreur réseau : ' + err.message, false);
+    document.getElementById('connect-status-area').innerHTML = `
+      <div class="alert alert-error" style="margin-top:12px">
+        ❌ Erreur réseau : ${err.message}<br>
+        <small>Vérifiez que le serveur est démarré et rechargez la page.</small>
+      </div>`;
     btn.disabled = false;
-    btn.innerHTML = '<span>🔗</span> Générer le code d\'appairage';
+    btn.innerHTML = '<span>🔗</span> Générer le code d'appairage';
   }
 }
 
 function startPolling(phone) {
   if (pollTimer) clearInterval(pollTimer);
-  pollTimer = setInterval(() => pollStatus(phone), 2000);
+  let attempts = 0;
+  pollTimer = setInterval(async () => {
+    attempts++;
+    dbg(`Poll #${attempts} GET /api/connect/${phone}`);
+    await pollStatus(phone);
+    if (attempts > 90) { // 3 min max
+      clearInterval(pollTimer);
+      pollTimer = null;
+      dbg('Timeout polling (3 min)', true);
+    }
+  }, 2000);
 }
 
 async function pollStatus(phone) {
   try {
     const r    = await fetch(`${BASE}/api/connect/${phone}`);
+    if (!r.ok) { dbg(`Poll erreur HTTP ${r.status}`, true); return; }
     const data = await r.json();
+    dbg(`Poll status: ${data.status}${data.pairingCode ? ' code='+data.pairingCode : ''}`);
     updateConnectUI(phone, data);
 
     if (data.status === 'connected' || data.status === 'error') {
@@ -433,9 +506,11 @@ async function pollStatus(phone) {
       pollTimer = null;
       const btn = document.getElementById('btn-connect');
       btn.disabled = false;
-      btn.innerHTML = '<span>🔗</span> Générer le code d\'appairage';
+      btn.innerHTML = '<span>🔗</span> Générer le code d'appairage';
     }
-  } catch {}
+  } catch (err) {
+    dbg(`Poll fetch erreur : ${err.message}`, true);
+  }
 }
 
 function updateConnectUI(phone, data) {
@@ -447,7 +522,7 @@ function updateConnectUI(phone, data) {
     document.getElementById('pairing-code').textContent = data.pairingCode;
     statusArea.innerHTML = `
       <div class="alert alert-warning">
-        ⏳ En attente de validation… Entrez le code dans WhatsApp.
+        ⏳ Code prêt ! Entrez-le dans WhatsApp → Paramètres → Appareils connectés.
       </div>`;
   }
 
@@ -458,7 +533,7 @@ function updateConnectUI(phone, data) {
   if (data.status === 'error') {
     statusArea.innerHTML = `
       <div class="alert alert-error">
-        ❌ Erreur : ${data.error || 'Connexion échouée'}.<br>
+        ❌ ${data.error || 'Connexion échouée'}.<br>
         <small>Attendez 5 min et réessayez.</small>
       </div>`;
   }
@@ -474,11 +549,11 @@ function showConnected(phone, apiKey) {
         <code id="shown-key">${apiKey || '—'}</code>
         <button class="copy-btn" onclick="copy(document.getElementById('shown-key').textContent)">Copier</button>
       </div>
-      <small style="color:var(--muted)">⚠️ Conservez cette clé en lieu sûr. Elle a été envoyée sur votre WhatsApp.</small>
+      <small style="color:var(--muted)">⚠️ Conservez cette clé. Elle a aussi été envoyée sur votre WhatsApp.</small>
     </div>`;
-  // Pré-remplir l'onglet Envoyer
   document.getElementById('send-from').value   = phone;
   document.getElementById('send-apikey').value = apiKey || '';
+  dbg(`✅ Connecté ! Clé : ${apiKey}`);
 }
 
 // ── SEND TEXT ───────────────────────────────────────────────────────────────
@@ -499,10 +574,7 @@ async function sendText() {
   try {
     const r = await fetch(`${BASE}/api/send/text`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key': apiKey,
-      },
+      headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
       body: JSON.stringify({ from, to, message }),
     });
     const data = await r.json();
@@ -510,7 +582,7 @@ async function sendText() {
     if (data.success) {
       toast('Message envoyé !');
       document.getElementById('send-result').innerHTML = `
-        <div class="alert alert-info" style="margin-top:12px">✅ Message envoyé à ${to}</div>`;
+        <div class="alert alert-info" style="margin-top:12px">✅ Envoyé à ${to}</div>`;
     } else {
       toast(data.error || 'Erreur', false);
       document.getElementById('send-result').innerHTML = `
@@ -524,7 +596,7 @@ async function sendText() {
   btn.innerHTML = '<span>📤</span> Envoyer';
 }
 
-// ── LOAD SESSIONS ───────────────────────────────────────────────────────────
+// ── SESSIONS ────────────────────────────────────────────────────────────────
 async function loadSessions() {
   const container = document.getElementById('sessions-list');
   container.innerHTML = '<div style="color:var(--muted);font-size:14px">Chargement…</div>';
@@ -547,7 +619,7 @@ async function loadSessions() {
             </span>
             <span class="session-phone">${s.phone}</span>
           </div>
-          <div class="session-key">${s.apiKey ? s.apiKey : 'Clé non disponible'}</div>
+          <div class="session-key">${s.apiKey || 'Clé non disponible'}</div>
         </div>
         <div class="session-actions">
           ${s.apiKey ? `<button class="copy-btn" onclick="copy('${s.apiKey}')">Copier clé</button>` : ''}
@@ -566,6 +638,13 @@ async function deleteSession(phone) {
   toast(`Session ${phone} supprimée.`);
   loadSessions();
 }
+
+// ── Debug log visible dans la page ─────────────────────────────────────────
+// Affiche l'activité réseau directement dans l'UI (utile pour debug en prod)
+dbg(`Page chargée. BASE=${BASE}`);
+document.getElementById('debug-panel').style.display = 'block';
+
 </script>
+
 </body>
 </html>

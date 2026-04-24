@@ -7,7 +7,7 @@ import fs             from 'fs';
 import { fileURLToPath } from 'url';
 
 import { router as apiRouter, restoreSessionsOnBoot } from './app/routes/api.js';
-import { router as statusRouter }  from './app/routes/status.js';
+import { router as statusRouter } from './app/routes/status.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -23,25 +23,21 @@ if (!fs.existsSync(logoPath)) {
 
 const app  = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
+const SELF = process.env.RENDER_EXTERNAL_URL || 'https://deku-service.onrender.com';
 
+// Render proxy trust
 app.set('trust proxy', 1);
 
-// CORS — IPs Render : 74.220.48.0/24 et 74.220.56.0/24
-const ALLOWED_ORIGINS = [
-  'https://deku-service.onrender.com',
-  'http://localhost:3000',
-  'http://localhost:5173',
-];
-
+// ── CORS — AVANT helmet et tout le reste ─────────────────────────────────────
 app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin) return cb(null, true);
-    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
-    cb(new Error(`CORS bloqué : ${origin}`));
-  },
+  origin: true,        // autoriser toutes les origines (le service est public)
   credentials: true,
+  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Api-Key'],
 }));
+app.options('*', cors()); // pré-vol OPTIONS
 
+// ── Helmet — CSP permissif pour une SPA self-hosted ──────────────────────────
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -50,17 +46,27 @@ app.use(helmet({
       styleSrc:   ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
       fontSrc:    ["'self'", 'https://fonts.gstatic.com'],
       imgSrc:     ["'self'", 'data:', 'blob:'],
-      connectSrc: ["'self'"],
+      // connectSrc DOIT inclure le domaine Render pour que fetch() fonctionne
+      connectSrc: ["'self'", SELF],
     },
   },
+  crossOriginEmbedderPolicy: false, // évite des blocages sur certains navigateurs
 }));
 
-app.use('/api/', rateLimit({
-  windowMs: 60_000, max: 30,
+// ── Rate limit — séparé par route, genereux pour le polling ──────────────────
+app.use('/api/send', rateLimit({
+  windowMs: 60_000, max: 60, standardHeaders: true, legacyHeaders: false,
+  validate: { trustProxy: false },
+  message: { error: 'Trop de requêtes.' },
+}));
+app.use('/api/connect', rateLimit({
+  windowMs: 60_000, max: 200,  // polling 2s = ~30/min, 200 = très large marge
   standardHeaders: true, legacyHeaders: false,
-  message: { error: 'Trop de requêtes, réessayez dans une minute.' },
+  validate: { trustProxy: false },
+  message: { error: 'Trop de requêtes.' },
 }));
 
+// ── Body / Static / Routes ────────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -68,9 +74,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api', apiRouter);
 app.use('/api/status', statusRouter);
 
-// Health check — Render ping ce endpoint
+// Health check — Render ping ce endpoint pour vérifier la santé du service
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', uptime: process.uptime(), ts: Date.now() });
+  res.json({ status: 'ok', uptime: Math.round(process.uptime()), port: PORT });
 });
 
 // SPA fallback
@@ -78,20 +84,20 @@ app.get('*', (_req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// ── Démarrage ─────────────────────────────────────────────────────────────────
 app.listen(PORT, '0.0.0.0', async () => {
-  console.log(`✅ WhatsApp API Agent V2 — https://deku-service.onrender.com`);
-  console.log(`   Local : http://localhost:${PORT}`);
+  console.log(`✅ WhatsApp API Agent V2 — port ${PORT}`);
+  console.log(`   URL : ${SELF}`);
   await restoreSessionsOnBoot();
 });
 
 process.on('uncaughtException',  err => console.error('[uncaughtException]',  err.message));
 process.on('unhandledRejection', err => console.error('[unhandledRejection]', err));
 
-// Auto-ping pour éviter le sleep Render free tier (sleep après 15 min)
-const RENDER_URL = process.env.RENDER_EXTERNAL_URL || 'https://deku-service.onrender.com';
+// Auto-ping anti-sleep Render free tier (dort après 15 min d'inactivité)
 setInterval(async () => {
   try {
-    const { default: https } = await import('https');
-    https.get(`${RENDER_URL}/health`, () => {}).on('error', () => {});
+    const mod = SELF.startsWith('https') ? (await import('https')).default : (await import('http')).default;
+    mod.get(`${SELF}/health`, r => r.resume()).on('error', () => {});
   } catch {}
 }, 14 * 60 * 1000);

@@ -1,0 +1,7 @@
+node_modules/
+sessions/
+output/
+logs/
+assets/logo.png
+*.log
+.env

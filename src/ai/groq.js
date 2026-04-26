@@ -13,10 +13,10 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 // ── Model Pool (random per request) ──────────────────────────────────────────
 const MODELS = [
   'llama-3.3-70b-versatile',
-  'llama-3.1-70b-versatile',
-  'llama3-70b-8192',
-  'mixtral-8x7b-32768',
-  'gemma2-9b-it',
+  'llama-3.1-8b-instant',
+  'openai/gpt-oss-120b',
+  'meta-llama/llama-4-scout-17b-16e-instruct',
+  'openai/gpt-oss-safeguard-20b',
 ];
 
 function pickModel() {

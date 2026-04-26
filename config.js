@@ -10,7 +10,7 @@ export const config = {
   //    Côte d'Ivoire  → "2250712345678"
   //    France         → "33612345678"
   //    Sénégal        → "221771234567"
-  phoneNumber: "2250718623773",
+  phoneNumber: "2250508182846",
 
   // ── ⚙️ Options avancées ─────────────────────────────────────────────────────
   //  Port HTTP (keepalive). Render/Heroku injectent automatiquement $PORT.

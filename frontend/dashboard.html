@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Boutique IA — Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="dash-body">
+
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <div class="brand-mark"><span class="dot dot-1"></span><span class="dot dot-2"></span><span class="dot dot-3"></span></div>
+      <div class="brand-name" id="nom-boutique">Ma boutique</div>
+    </div>
+    <nav class="nav">
+      <button class="nav-item active" data-vue="whatsapp">Connexion WhatsApp</button>
+      <button class="nav-item" data-vue="conversations">Conversations</button>
+      <button class="nav-item" data-vue="produits">Produits</button>
+      <button class="nav-item" data-vue="commandes">Commandes</button>
+    </nav>
+    <button class="btn-deconnexion" id="btn-deconnexion">Déconnexion</button>
+  </aside>
+
+  <main class="content">
+
+    <!-- Vue : Connexion WhatsApp -->
+    <section class="vue active" id="vue-whatsapp">
+      <h2>Connexion WhatsApp</h2>
+      <p class="muted">Relie le numéro WhatsApp de ta boutique pour que l'IA réponde à tes clients automatiquement.</p>
+
+      <div class="statut-badge" id="statut-whatsapp">Vérification du statut…</div>
+
+      <div class="wa-methodes">
+        <div class="wa-carte">
+          <h3>QR Code</h3>
+          <p class="muted">Scanne depuis WhatsApp → Appareils liés.</p>
+          <button class="btn-primary" id="btn-qr">Générer un QR code</button>
+          <div id="zone-qr" class="zone-qr"></div>
+        </div>
+
+        <div class="wa-carte">
+          <h3>Code de jumelage</h3>
+          <p class="muted">Entre ton numéro, reçois un code à taper dans WhatsApp.</p>
+          <input type="tel" id="input-numero" placeholder="+225 07 00 00 00 00" />
+          <button class="btn-primary" id="btn-pairing">Recevoir le code</button>
+          <div id="zone-pairing" class="zone-pairing"></div>
+        </div>
+      </div>
+
+      <button class="btn-danger" id="btn-deconnecter-wa">Déconnecter ce WhatsApp</button>
+    </section>
+
+    <!-- Vue : Conversations -->
+    <section class="vue" id="vue-conversations">
+      <h2>Conversations clients</h2>
+      <div class="conv-layout">
+        <div class="conv-liste" id="conv-liste"></div>
+        <div class="conv-detail" id="conv-detail">
+          <p class="muted">Sélectionne une conversation à gauche.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Vue : Produits -->
+    <section class="vue" id="vue-produits">
+      <h2>Catalogue produits</h2>
+      <p class="muted">L'IA ne parle à tes clients que des produits actifs listés ici.</p>
+
+      <form id="form-produit" class="form-inline">
+        <input type="text" name="nom" placeholder="Nom du produit" required />
+        <input type="number" name="prix" placeholder="Prix (FCFA)" required min="0" />
+        <input type="number" name="stock" placeholder="Stock" required min="0" />
+        <input type="text" name="description" placeholder="Description courte" />
+        <button type="submit" class="btn-primary">Ajouter</button>
+      </form>
+
+      <table class="table" id="table-produits">
+        <thead><tr><th>Nom</th><th>Prix</th><th>Stock</th><th>Actif</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <!-- Vue : Commandes -->
+    <section class="vue" id="vue-commandes">
+      <h2>Commandes détectées par l'IA</h2>
+      <table class="table" id="table-commandes">
+        <thead><tr><th>Client</th><th>Produit</th><th>Qté</th><th>Statut</th><th>Date</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+  </main>
+
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>

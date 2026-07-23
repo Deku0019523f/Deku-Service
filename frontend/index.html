@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Boutique IA — Connexion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="auth-body">
+
+  <div class="auth-wrap">
+    <div class="auth-mark">
+      <span class="dot dot-1"></span><span class="dot dot-2"></span><span class="dot dot-3"></span>
+    </div>
+
+    <h1 class="auth-title">Ton agent répond<br/>pendant que tu vends.</h1>
+    <p class="auth-sub">Connecte le WhatsApp de ta boutique, l'IA prend le relais avec tes clients.</p>
+
+    <div class="auth-card">
+      <div class="tabs">
+        <button class="tab active" data-tab="connexion">Connexion</button>
+        <button class="tab" data-tab="inscription">Créer une boutique</button>
+      </div>
+
+      <form id="form-connexion" class="tab-panel active">
+        <label>Email
+          <input type="email" name="email" required placeholder="toi@boutique.com" />
+        </label>
+        <label>Mot de passe
+          <input type="password" name="motDePasse" required placeholder="••••••••" />
+        </label>
+        <button type="submit" class="btn-primary">Se connecter</button>
+        <p class="form-erreur" id="erreur-connexion"></p>
+      </form>
+
+      <form id="form-inscription" class="tab-panel">
+        <label>Nom de la boutique
+          <input type="text" name="nomBoutique" required placeholder="Ex : Chez Awa Fashion" />
+        </label>
+        <label>Email
+          <input type="email" name="email" required placeholder="toi@boutique.com" />
+        </label>
+        <label>Téléphone <span class="optionnel">(optionnel)</span>
+          <input type="tel" name="telephone" placeholder="+225 07 00 00 00 00" />
+        </label>
+        <label>Mot de passe
+          <input type="password" name="motDePasse" required minlength="6" placeholder="6 caractères minimum" />
+        </label>
+        <button type="submit" class="btn-primary">Créer ma boutique</button>
+        <p class="form-erreur" id="erreur-inscription"></p>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+</body>
+</html>
